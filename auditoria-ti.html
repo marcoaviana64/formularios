@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Auditoria de Parque de TI x Cobrança</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+  :root{
+    --ink:#1A1A1A;
+    --paper:#FBF9F5;
+    --card:#FFFFFF;
+    --line:#E6E1D6;
+    --gold:#C9A227;
+    --gold-soft:#F3E9CC;
+    --muted:#7A7468;
+    --bad:#B5482A;
+    --bad-bg:#FBEDE7;
+    --ok:#5C6B3E;
+    --ok-bg:#EEF1E6;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:'Calibri','Segoe UI',Arial,sans-serif;
+    background:var(--paper);
+    color:var(--ink);
+    padding:32px 16px 64px;
+  }
+  .wrap{max-width:980px;margin:0 auto;}
+  header{margin-bottom:28px;}
+  .eyebrow{
+    font-size:12px;letter-spacing:3px;text-transform:uppercase;
+    color:var(--gold);font-weight:700;margin-bottom:8px;
+  }
+  h1{
+    font-family:Cambria,'Times New Roman',serif;
+    font-size:32px;margin:0 0 6px;line-height:1.15;
+  }
+  .sub{color:var(--muted);font-size:14px;max-width:640px;}
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:24px;
+    margin-bottom:20px;
+    box-shadow:0 2px 10px rgba(26,26,26,0.04);
+  }
+  .card h2{
+    font-family:Cambria,serif;
+    font-size:19px;margin:0 0 4px;
+  }
+  .card .hint{color:var(--muted);font-size:13px;margin:0 0 18px;}
+
+  label.field{display:block;margin-bottom:14px;}
+  label.field span{
+    display:block;font-size:13px;font-weight:700;margin-bottom:5px;color:var(--ink);
+  }
+  input[type=text], input[type=number]{
+    width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:6px;
+    font-size:15px;font-family:inherit;background:#fff;color:var(--ink);
+  }
+  input:focus{outline:2px solid var(--gold);outline-offset:1px;border-color:var(--gold);}
+
+  .grid-row{
+    display:grid;
+    grid-template-columns: 1.6fr 1fr 1fr;
+    gap:14px;
+    align-items:start;
+  }
+  .grid-head{
+    display:grid;
+    grid-template-columns: 1.6fr 1fr 1fr;
+    gap:14px;
+    font-size:11px;letter-spacing:1.5px;text-transform:uppercase;
+    color:var(--muted);font-weight:700;
+    padding:0 0 8px;
+    border-bottom:1px solid var(--line);
+    margin-bottom:12px;
+  }
+  .item-name{
+    display:flex;align-items:center;font-size:14px;font-weight:700;padding-top:9px;
+  }
+  .item-row{padding:8px 0;border-bottom:1px solid var(--line);}
+  .item-row:last-child{border-bottom:none;}
+
+  .meta-grid{
+    display:grid;grid-template-columns:repeat(2,1fr);gap:14px;
+  }
+  @media (max-width:640px){
+    .meta-grid{grid-template-columns:1fr;}
+    .grid-row, .grid-head{grid-template-columns:1.3fr 1fr 1fr;gap:8px;}
+    .grid-head span{font-size:9px;}
+  }
+
+  .actions{
+    display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;
+  }
+  button{
+    font-family:inherit;font-size:15px;font-weight:700;
+    padding:13px 22px;border-radius:7px;border:none;cursor:pointer;
+    transition:transform .05s ease, opacity .15s ease;
+  }
+  button:active{transform:translateY(1px);}
+  .btn-primary{background:var(--ink);color:#fff;}
+  .btn-primary:hover{opacity:.88;}
+  .btn-gold{background:var(--gold);color:var(--ink);}
+  .btn-gold:hover{opacity:.88;}
+  .btn-ghost{background:transparent;border:1px solid var(--line);color:var(--ink);}
+  .btn-ghost:hover{background:var(--gold-soft);}
+
+  #status{
+    margin-top:14px;font-size:13px;color:var(--muted);min-height:18px;
+  }
+  #status.ok{color:var(--ok);font-weight:700;}
+  #status.err{color:var(--bad);font-weight:700;}
+
+  /* Preview / análise */
+  .preview-table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  .preview-table th, .preview-table td{
+    text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);
+  }
+  .preview-table th{
+    font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);
+    border-bottom:2px solid var(--ink);
+  }
+  .preview-table td.num, .preview-table th.num{text-align:center;}
+  .tag{
+    display:inline-block;padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:700;
+  }
+  .tag-ok{background:var(--ok-bg);color:var(--ok);}
+  .tag-bad{background:var(--bad-bg);color:var(--bad);}
+  .tag-neutral{background:var(--gold-soft);color:#7a5c00;}
+
+  footer{text-align:center;color:var(--muted);font-size:12px;margin-top:30px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Auditoria de TI</div>
+    <h1>Parque Instalado x Cobrança de Sistemas</h1>
+    <p class="sub">Preencha as quantidades reais do parque (instalado/em uso) e as quantidades que estão sendo cobradas por cada fornecedor. Ao final, gere a planilha Excel com os dados e o relatório PDF com a análise comparativa.</p>
+  </header>
+
+  <div class="card">
+    <h2>Identificação</h2>
+    <p class="hint">Informações gerais sobre o local/unidade auditada.</p>
+    <div class="meta-grid">
+      <label class="field"><span>Nome do local / unidade</span>
+        <input type="text" id="metaLocal" placeholder="Ex.: Administração do Shopping X">
+      </label>
+      <label class="field"><span>Responsável pelo levantamento</span>
+        <input type="text" id="metaResponsavel" placeholder="Nome do responsável">
+      </label>
+      <label class="field"><span>Data do levantamento</span>
+        <input type="text" id="metaData" placeholder="dd/mm/aaaa">
+      </label>
+      <label class="field"><span>Observações gerais</span>
+        <input type="text" id="metaObs" placeholder="Opcional">
+      </label>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Parque instalado x quantidade cobrada</h2>
+    <p class="hint">Para cada item, informe quantos existem realmente em uso (Parque) e quantos estão sendo cobrados na fatura do fornecedor (Cobrado).</p>
+
+    <div class="grid-head">
+      <span>Item</span><span>Parque (real)</span><span>Cobrado (fatura)</span>
+    </div>
+
+    <div id="itemsContainer"></div>
+  </div>
+
+  <div class="card">
+    <h2>Gerar arquivos</h2>
+    <p class="hint">A planilha Excel traz os dados informados e a análise comparativa em abas separadas. O PDF traz um relatório com a mesma análise, pronto para apresentação.</p>
+    <div class="actions">
+      <button class="btn-primary" onclick="generateExcel()">Gerar Excel (.xlsx)</button>
+      <button class="btn-gold" onclick="generatePDF()">Gerar Relatório PDF</button>
+      <button class="btn-ghost" onclick="previewAnalysis()">Visualizar análise</button>
+      <button class="btn-ghost" onclick="resetForm()">Limpar formulário</button>
+    </div>
+    <div id="status"></div>
+  </div>
+
+  <div class="card" id="previewCard" style="display:none;">
+    <h2>Análise comparativa</h2>
+    <p class="hint">Pré-visualização do que será incluído no Excel e no PDF.</p>
+    <div id="previewTableWrap"></div>
+  </div>
+
+  <footer>Formulário genérico de auditoria de parque de TI — gera Excel e PDF localmente, sem envio de dados a servidores.<br>Criado por Nervia Tecnologia da Informação</footer>
+</div>
+
+<script>
+// ---------------------------------------------------------------
+// Definição genérica dos itens auditados
+// ---------------------------------------------------------------
+const ITEMS = [
+  { key: "computadores", label: "Computadores",           unit: "computadores" },
+  { key: "o365standard", label: "Office 365 Standard",    unit: "contas" },
+  { key: "o365basic",    label: "Office 365 Basic",       unit: "contas" },
+  { key: "o365plan1",    label: "Office 365 Plan 1",      unit: "contas" },
+  { key: "o365plan2",    label: "Office 365 Plan 2",      unit: "contas" },
+  { key: "rmm",          label: "Sistema RMM",            unit: "computadores" },
+  { key: "backup",       label: "Sistema de Backup",      unit: "contas" },
+  { key: "antivirus",    label: "Sistema Antivírus",      unit: "computadores" },
+];
+
+function buildForm(){
+  const container = document.getElementById("itemsContainer");
+  container.innerHTML = "";
+  ITEMS.forEach(item => {
+    const row = document.createElement("div");
+    row.className = "grid-row item-row";
+    row.innerHTML = `
+      <div class="item-name">${item.label}</div>
+      <div><input type="number" min="0" step="1" id="parque_${item.key}" placeholder="0"></div>
+      <div><input type="number" min="0" step="1" id="cobrado_${item.key}" placeholder="0"></div>
+    `;
+    container.appendChild(row);
+  });
+}
+buildForm();
+
+function getVal(id){
+  const el = document.getElementById(id);
+  const v = parseInt(el.value, 10);
+  return isNaN(v) ? 0 : v;
+}
+
+function setStatus(msg, type){
+  const el = document.getElementById("status");
+  el.textContent = msg;
+  el.className = type || "";
+}
+
+function getMeta(){
+  return {
+    local: document.getElementById("metaLocal").value.trim() || "Não informado",
+    responsavel: document.getElementById("metaResponsavel").value.trim() || "Não informado",
+    data: document.getElementById("metaData").value.trim() || new Date().toLocaleDateString("pt-BR"),
+    obs: document.getElementById("metaObs").value.trim(),
+  };
+}
+
+// ---------------------------------------------------------------
+// Núcleo da análise
+// ---------------------------------------------------------------
+function buildAnalysis(){
+  const meta = getMeta();
+  const computadores = getVal("parque_computadores");
+
+  const rows = ITEMS.map(item => {
+    const parque = getVal("parque_" + item.key);
+    const cobrado = getVal("cobrado_" + item.key);
+    const diff = cobrado - parque; // positivo = cobrando mais do que existe; negativo = cobrando menos
+
+    let status, statusTag, comentario;
+    if (diff === 0){
+      status = "OK";
+      statusTag = "tag-ok";
+      comentario = "Cobrança compatível com o parque.";
+    } else if (diff > 0){
+      status = `COBRANÇA A MAIOR (+${diff})`;
+      statusTag = "tag-bad";
+      if (item.unit === "computadores"){
+        comentario = `Cobrando ${diff} unidade(s) além dos ${parque} computadores reais. Verificar com o fornecedor se há agentes/instalações de equipamentos que não existem mais, ou erro de contagem.`;
+      } else {
+        comentario = `Cobrando ${diff} licença(s)/conta(s) além das ${parque} em uso. Verificar se há licenças sobrando que podem ser canceladas ou redistribuídas.`;
+      }
+    } else {
+      const falta = Math.abs(diff);
+      status = `COBRANÇA A MENOR (-${falta})`;
+      statusTag = "tag-bad";
+      comentario = `Existem ${parque} em uso, porém apenas ${cobrado} estão sendo cobrados. Faltam ${falta} na fatura — risco de contas/equipamentos sem cobertura de licença, suporte ou backup.`;
+    }
+
+    // Observação extra: itens que cobram por nº de computadores
+    let referencia = "";
+    if (item.unit === "computadores" && item.key !== "computadores"){
+      const diffVsComputadores = cobrado - computadores;
+      if (computadores > 0 && diffVsComputadores !== 0){
+        referencia = ` (referência: parque tem ${computadores} computadores; cobrança difere em ${diffVsComputadores > 0 ? "+" : ""}${diffVsComputadores} em relação a esse total)`;
+      }
+    }
+
+    return {
+      item: item.label,
+      unidade: item.unit,
+      parque,
+      cobrado,
+      diff,
+      status,
+      statusTag,
+      comentario: comentario + referencia,
+    };
+  });
+
+  const divergentes = rows.filter(r => r.diff !== 0);
+  const aMaior = rows.filter(r => r.diff > 0);
+  const aMenor = rows.filter(r => r.diff < 0);
+
+  let resumo;
+  if (divergentes.length === 0){
+    resumo = "Nenhuma divergência encontrada: todas as cobranças estão alinhadas com o parque informado.";
+  } else {
+    const partes = [];
+    if (aMaior.length){
+      partes.push(`${aMaior.length} item(ns) com cobrança ACIMA do parque (possível pagamento indevido): ${aMaior.map(r=>r.item).join(", ")}.`);
+    }
+    if (aMenor.length){
+      partes.push(`${aMenor.length} item(ns) com cobrança ABAIXO do parque (possível falta de cobertura): ${aMenor.map(r=>r.item).join(", ")}.`);
+    }
+    resumo = partes.join(" ");
+  }
+
+  return { meta, computadores, rows, divergentes, aMaior, aMenor, resumo };
+}
+
+// ---------------------------------------------------------------
+// Pré-visualização em tela
+// ---------------------------------------------------------------
+function previewAnalysis(){
+  const a = buildAnalysis();
+  const wrap = document.getElementById("previewTableWrap");
+
+  let html = `<p style="margin-top:0;"><strong>Local:</strong> ${escapeHtml(a.meta.local)} &nbsp;|&nbsp; <strong>Responsável:</strong> ${escapeHtml(a.meta.responsavel)} &nbsp;|&nbsp; <strong>Data:</strong> ${escapeHtml(a.meta.data)}</p>`;
+  html += `<table class="preview-table"><thead><tr>
+    <th>Item</th><th class="num">Parque (real)</th><th class="num">Cobrado</th><th class="num">Diferença</th><th>Situação</th>
+  </tr></thead><tbody>`;
+  a.rows.forEach(r => {
+    html += `<tr>
+      <td>${escapeHtml(r.item)}</td>
+      <td class="num">${r.parque}</td>
+      <td class="num">${r.cobrado}</td>
+      <td class="num">${r.diff > 0 ? "+" + r.diff : r.diff}</td>
+      <td><span class="tag ${r.statusTag}">${escapeHtml(r.status)}</span></td>
+    </tr>`;
+  });
+  html += `</tbody></table>`;
+  html += `<p style="margin-top:16px;"><strong>Resumo:</strong> ${escapeHtml(a.resumo)}</p>`;
+
+  if (a.divergentes.length){
+    html += `<p style="font-weight:700;margin-bottom:6px;">Detalhamento das divergências:</p><ul style="margin-top:0;padding-left:20px;">`;
+    a.divergentes.forEach(r => {
+      html += `<li style="margin-bottom:6px;"><strong>${escapeHtml(r.item)}:</strong> ${escapeHtml(r.comentario)}</li>`;
+    });
+    html += `</ul>`;
+  }
+
+  if (a.meta.obs){
+    html += `<p><strong>Observações:</strong> ${escapeHtml(a.meta.obs)}</p>`;
+  }
+
+  wrap.innerHTML = html;
+  document.getElementById("previewCard").style.display = "block";
+  document.getElementById("previewCard").scrollIntoView({behavior:"smooth", block:"start"});
+}
+
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[c]));
+}
+
+// ---------------------------------------------------------------
+// Geração de Excel
+// ---------------------------------------------------------------
+function generateExcel(){
+  try{
+    const a = buildAnalysis();
+    const wb = XLSX.utils.book_new();
+
+    // Aba 1: Identificação
+    const metaSheetData = [
+      ["Campo", "Valor"],
+      ["Local / unidade", a.meta.local],
+      ["Responsável", a.meta.responsavel],
+      ["Data do levantamento", a.meta.data],
+      ["Observações", a.meta.obs],
+    ];
+    const wsMeta = XLSX.utils.aoa_to_sheet(metaSheetData);
+    wsMeta["!cols"] = [{wch:24},{wch:50}];
+    XLSX.utils.book_append_sheet(wb, wsMeta, "Identificação");
+
+    // Aba 2: Dados informados (parque x cobrado)
+    const dataSheet = [["Item", "Unidade", "Parque (real)", "Cobrado (fatura)"]];
+    a.rows.forEach(r => dataSheet.push([r.item, r.unidade, r.parque, r.cobrado]));
+    const wsData = XLSX.utils.aoa_to_sheet(dataSheet);
+    wsData["!cols"] = [{wch:24},{wch:14},{wch:14},{wch:18}];
+    XLSX.utils.book_append_sheet(wb, wsData, "Dados Informados");
+
+    // Aba 3: Análise comparativa
+    const analysisSheet = [["Item", "Parque (real)", "Cobrado (fatura)", "Diferença", "Situação", "Comentário"]];
+    a.rows.forEach(r => analysisSheet.push([r.item, r.parque, r.cobrado, r.diff, r.status, r.comentario]));
+    analysisSheet.push([]);
+    analysisSheet.push(["Resumo geral", a.resumo]);
+    analysisSheet.push([]);
+    analysisSheet.push(["Criado por", "Nervia Tecnologia da Informação"]);
+    const wsAnalysis = XLSX.utils.aoa_to_sheet(analysisSheet);
+    wsAnalysis["!cols"] = [{wch:24},{wch:14},{wch:16},{wch:12},{wch:24},{wch:70}];
+    XLSX.utils.book_append_sheet(wb, wsAnalysis, "Análise");
+
+    const fileSafeLocal = (a.meta.local || "auditoria").replace(/[^a-z0-9]+/gi, "_").slice(0,40);
+    XLSX.writeFile(wb, `Auditoria_TI_${fileSafeLocal}.xlsx`);
+    setStatus("Excel gerado com sucesso.", "ok");
+  } catch(err){
+    console.error(err);
+    setStatus("Erro ao gerar o Excel: " + err.message, "err");
+  }
+}
+
+// ---------------------------------------------------------------
+// Geração de PDF
+// ---------------------------------------------------------------
+function generatePDF(){
+  try{
+    const a = buildAnalysis();
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const pageW = doc.internal.pageSize.getWidth();
+    const margin = 40;
+
+    // Header
+    doc.setFillColor(26,26,26);
+    doc.rect(0, 0, pageW, 90, "F");
+    doc.setTextColor(255,255,255);
+    doc.setFont("times", "bold");
+    doc.setFontSize(20);
+    doc.text("Auditoria de Parque de TI x Cobrança", margin, 40);
+    doc.setFont("helvetica","normal");
+    doc.setFontSize(11);
+    doc.setTextColor(233, 222, 199);
+    doc.text(`Local: ${a.meta.local}`, margin, 62);
+    doc.text(`Responsável: ${a.meta.responsavel}    |    Data: ${a.meta.data}`, margin, 78);
+
+    let y = 115;
+    doc.setTextColor(26,26,26);
+
+    // Tabela comparativa
+    doc.autoTable({
+      startY: y,
+      margin: { left: margin, right: margin },
+      head: [["Item", "Parque (real)", "Cobrado", "Diferença", "Situação"]],
+      body: a.rows.map(r => [
+        r.item,
+        String(r.parque),
+        String(r.cobrado),
+        (r.diff > 0 ? "+" + r.diff : String(r.diff)),
+        r.status
+      ]),
+      styles: { font: "helvetica", fontSize: 10, cellPadding: 6 },
+      headStyles: { fillColor: [26,26,26], textColor: [255,255,255], fontStyle: "bold" },
+      columnStyles: {
+        1: { halign: "center" },
+        2: { halign: "center" },
+        3: { halign: "center" },
+      },
+      didParseCell: function(data){
+        if (data.section === "body" && data.column.index === 4){
+          const val = data.cell.raw;
+          if (val.indexOf("MAIOR") !== -1 || val.indexOf("MENOR") !== -1){
+            data.cell.styles.textColor = [181,72,42];
+            data.cell.styles.fontStyle = "bold";
+          } else if (val === "OK"){
+            data.cell.styles.textColor = [92,107,62];
+            data.cell.styles.fontStyle = "bold";
+          }
+        }
+      }
+    });
+
+    y = doc.lastAutoTable.finalY + 24;
+
+    // Resumo
+    doc.setFont("times","bold");
+    doc.setFontSize(13);
+    doc.text("Resumo geral", margin, y);
+    y += 16;
+    doc.setFont("helvetica","normal");
+    doc.setFontSize(10.5);
+    y = writeWrapped(doc, a.resumo, margin, y, pageW - margin*2, 14);
+
+    // Detalhamento das divergências
+    if (a.divergentes.length){
+      y += 14;
+      if (y > 740) { doc.addPage(); y = 50; }
+      doc.setFont("times","bold");
+      doc.setFontSize(13);
+      doc.text("Detalhamento das divergências", margin, y);
+      y += 18;
+      doc.setFont("helvetica","normal");
+      doc.setFontSize(10.5);
+
+      a.divergentes.forEach(r => {
+        if (y > 760) { doc.addPage(); y = 50; }
+        doc.setFont("helvetica","bold");
+        doc.text("• " + r.item + ":", margin, y);
+        const labelWidth = doc.getTextWidth("• " + r.item + ":  ");
+        doc.setFont("helvetica","normal");
+        y = writeWrapped(doc, r.comentario, margin + labelWidth, y, pageW - margin*2 - labelWidth, 13, y);
+        y += 8;
+      });
+    }
+
+    // Observações
+    if (a.meta.obs){
+      y += 10;
+      if (y > 740) { doc.addPage(); y = 50; }
+      doc.setFont("times","bold");
+      doc.setFontSize(13);
+      doc.text("Observações", margin, y);
+      y += 16;
+      doc.setFont("helvetica","normal");
+      doc.setFontSize(10.5);
+      y = writeWrapped(doc, a.meta.obs, margin, y, pageW - margin*2, 14);
+    }
+
+    // Footer note
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++){
+      doc.setPage(i);
+      doc.setFontSize(8.5);
+      doc.setTextColor(120,116,104);
+      doc.text("Relatório gerado automaticamente a partir do formulário de auditoria de TI.", margin, 820);
+      doc.text("Criado por Nervia Tecnologia da Informação", margin, 832);
+      doc.text(String(i) + " / " + pageCount, pageW - margin - 20, 820);
+    }
+
+    const fileSafeLocal = (a.meta.local || "auditoria").replace(/[^a-z0-9]+/gi, "_").slice(0,40);
+    doc.save(`Relatorio_Auditoria_TI_${fileSafeLocal}.pdf`);
+    setStatus("PDF gerado com sucesso.", "ok");
+  } catch(err){
+    console.error(err);
+    setStatus("Erro ao gerar o PDF: " + err.message, "err");
+  }
+}
+
+// Helper: write wrapped text, returns new Y position
+function writeWrapped(doc, text, x, y, maxWidth, lineHeight, firstLineX){
+  const lines = doc.splitTextToSize(text, maxWidth);
+  lines.forEach((line, idx) => {
+    if (y > 800) { doc.addPage(); y = 50; }
+    doc.text(line, x, y);
+    y += lineHeight;
+  });
+  return y;
+}
+
+// ---------------------------------------------------------------
+// Reset
+// ---------------------------------------------------------------
+function resetForm(){
+  document.getElementById("metaLocal").value = "";
+  document.getElementById("metaResponsavel").value = "";
+  document.getElementById("metaData").value = "";
+  document.getElementById("metaObs").value = "";
+  ITEMS.forEach(item => {
+    document.getElementById("parque_" + item.key).value = "";
+    document.getElementById("cobrado_" + item.key).value = "";
+  });
+  document.getElementById("previewCard").style.display = "none";
+  setStatus("Formulário limpo.", "");
+}
+</script>
+</body>
+</html>
